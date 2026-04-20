@@ -223,8 +223,35 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
         return -1; // Hash mismatch! Object is corrupted.
     }
 
-    // (Step 5 code will go here)
+    // 4. Parse the header to extract the type string
+    unsigned char *null_byte = memchr(buffer, '\0', file_size);
+    if (!null_byte) {
+        free(buffer);
+        return -1; // Invalid format, no null terminator found
+    }
+
+    if (strncmp((char *)buffer, "blob ", 5) == 0) {
+        *type_out = OBJECT_BLOB;
+    } else if (strncmp((char *)buffer, "tree ", 5) == 0) {
+        *type_out = OBJECT_TREE;
+    } else if (strncmp((char *)buffer, "commit ", 7) == 0) {
+        *type_out = OBJECT_COMMIT;
+    } else {
+        free(buffer);
+        return -1; // Unknown object type
+    }
+
+    // 5. Allocate a buffer, copy the data portion, set *data_out and *len_out
+    size_t header_len = (null_byte - buffer) + 1;
+    *len_out = file_size - header_len;
+    
+    *data_out = malloc(*len_out);
+    if (!*data_out) {
+        free(buffer);
+        return -1;
+    }
+    memcpy(*data_out, buffer + header_len, *len_out);
 
     free(buffer);
-    return -1; // Placeholder until we extract the data
+    return 0; // Success!
 }
