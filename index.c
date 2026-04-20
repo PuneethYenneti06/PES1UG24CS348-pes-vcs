@@ -181,10 +181,39 @@ int index_load(Index *index) {
 //
 // Returns 0 on success, -1 on error.
 int index_save(const Index *index) {
-    // TODO: Implement atomic index saving
-    // (See Lab Appendix for logical steps)
-    (void)index;
-    return -1;
+    // Create a mutable copy for sorting
+    Index sorted = *index;
+    
+    // Sort entries by path (Git requirement for deterministic hashes)
+    static int compare_entries(const void *a, const void *b) {
+        return strcmp(((const IndexEntry *)a)->path, ((const IndexEntry *)b)->path);
+    }
+    qsort(sorted.entries, sorted.count, sizeof(IndexEntry), compare_entries);
+
+    // Build temporary file path
+    char temp_path[512];
+    snprintf(temp_path, sizeof(temp_path), "%s.tmp", INDEX_FILE);
+
+    // Write to temporary file
+    FILE *f = fopen(temp_path, "w");
+    if (!f) return -1;
+
+    for (int i = 0; i < sorted.count; i++) {
+        char hash_hex[HASH_HEX_SIZE + 1];
+        hash_to_hex(&sorted.entries[i].hash, hash_hex);
+
+        fprintf(f, "%o %s %lu %u %s\n",
+               sorted.entries[i].mode,
+               hash_hex,
+               sorted.entries[i].mtime_sec,
+               sorted.entries[i].size,
+               sorted.entries[i].path);
+    }
+
+    // (Sync and rename will go here in next step)
+
+    fclose(f);
+    return -1; // Placeholder
 }
 
 // Stage a file for the next commit.
