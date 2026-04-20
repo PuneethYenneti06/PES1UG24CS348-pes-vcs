@@ -221,5 +221,13 @@ int tree_from_index(ObjectID *id_out) {
         }
     }
 
-    return -1; // Placeholder
+    // Serialize the root tree
+    void *data;
+    size_t len;
+    if (tree_serialize(&tree, &data, &len) != 0) return -1;
+
+    // Write root tree to object store
+    int ret = object_write(OBJ_TREE, data, len, id_out);
+    free(data);
+    return ret;
 }
