@@ -186,8 +186,38 @@ int tree_from_index(ObjectID *id_out) {
             te->mode = MODE_DIR;
             strcpy(te->name, dir_name);
 
-            // Build subtree by recursively calling tree_from_index on the subentries
-            // For simplicity, we'll handle this in the next step
+            // Build subtree by creating a temporary sub-index
+            Index sub_index;
+            sub_index.count = 0;
+            for (int j = dir_start; j < i; j++) {
+                // Strip the directory prefix from paths
+                strcpy(sub_index.entries[sub_index.count].path, 
+                       index.entries[j].path + dir_len + 1);
+                sub_index.entries[sub_index.count].mode = index.entries[j].mode;
+                sub_index.entries[sub_index.count].hash = index.entries[j].hash;
+                sub_index.count++;
+            }
+
+            // Recursively process the subtree (simplified: just handle files for now)
+            Tree sub_tree = { .count = 0 };
+            for (int j = 0; j < sub_index.count; j++) {
+                if (strchr(sub_index.entries[j].path, '/') == NULL) {
+                    TreeEntry *sub_te = &sub_tree.entries[sub_tree.count++];
+                    sub_te->mode = sub_index.entries[j].mode;
+                    strcpy(sub_te->name, sub_index.entries[j].path);
+                    sub_te->hash = sub_index.entries[j].hash;
+                }
+            }
+
+            // Serialize and write this subtree
+            void *sub_data;
+            size_t sub_len;
+            if (tree_serialize(&sub_tree, &sub_data, &sub_len) != 0) return -1;
+            if (object_write(OBJ_TREE, sub_data, sub_len, &te->hash) != 0) {
+                free(sub_data);
+                return -1;
+            }
+            free(sub_data);
         }
     }
 
