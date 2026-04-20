@@ -145,7 +145,27 @@ int tree_from_index(ObjectID *id_out) {
         return ret;
     }
 
-    // (Main tree building logic will go here)
+    Tree tree = { .count = 0 };
+    
+    // Sort entries by path for consistent processing
+    // (Index should already be sorted, but we process in order)
+    int i = 0;
+    while (i < index.count) {
+        const char *entry_path = index.entries[i].path;
+        const char *slash = strchr(entry_path, '/');
+
+        if (!slash) {
+            // Simple file at root level
+            TreeEntry *te = &tree.entries[tree.count++];
+            te->mode = index.entries[i].mode;
+            strcpy(te->name, entry_path);
+            te->hash = index.entries[i].hash;
+            i++;
+        } else {
+            // Directory (handle in next step)
+            i++;
+        }
+    }
 
     return -1; // Placeholder
 }
