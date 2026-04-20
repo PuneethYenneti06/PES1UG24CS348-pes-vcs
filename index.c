@@ -210,10 +210,18 @@ int index_save(const Index *index) {
                sorted.entries[i].path);
     }
 
-    // (Sync and rename will go here in next step)
-
+    // Flush to disk
+    fflush(f);
+    fsync(fileno(f));
     fclose(f);
-    return -1; // Placeholder
+
+    // Atomically rename temp file to index file
+    if (rename(temp_path, INDEX_FILE) < 0) {
+        unlink(temp_path);
+        return -1;
+    }
+
+    return 0;
 }
 
 // Stage a file for the next commit.
