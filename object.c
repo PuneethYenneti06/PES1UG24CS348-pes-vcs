@@ -121,10 +121,43 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         return 0; // Deduplication: already exists
     }
 
-    // (Step 2 code will go here)
+    // 4. Create shard directory (.pes/objects/XX/)
+    char final_path[512];
+    object_path(id_out, final_path, sizeof(final_path));
+    
+    char dir_path[512];
+    snprintf(dir_path, sizeof(dir_path), "%s/%.2s", OBJECTS_DIR, final_path + strlen(OBJECTS_DIR) + 1);
+    mkdir(dir_path, 0755); // Ignore error if it already exists
+
+    // 5. Write to a temporary file
+    char temp_path[512];
+    snprintf(temp_path, sizeof(temp_path), "%s/temp_XXXXXX", dir_path);
+    int fd = mkstemp(temp_path);
+    if (fd < 0) {
+        free(full_data);
+        return -1;
+    }
+
+    if (write(fd, full_data, full_size) != (ssize_t)full_size) {
+        close(fd);
+        unlink(temp_path);
+        free(full_data);
+        return -1;
+    }
+
+    // 6. fsync() and close
+    fsync(fd);
+    close(fd);
+
+    // 7. Atomic rename to the final path
+    if (rename(temp_path, final_path) < 0) {
+        unlink(temp_path);
+        free(full_data);
+        return -1;
+    }
 
     free(full_data);
-    return -1; // Placeholder until we finish writing the file
+    return 0; // Success!
 }
 
 // Read an object from the store.
