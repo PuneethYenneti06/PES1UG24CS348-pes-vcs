@@ -143,7 +143,28 @@ int index_load(Index *index) {
         return 0;
     }
 
-    // (Parsing loop will go here in next step)
+    // Read and parse each line
+    while (index->count < MAX_INDEX_ENTRIES) {
+        IndexEntry *entry = &index->entries[index->count];
+        
+        char hash_hex[HASH_HEX_SIZE + 1];
+        int result = fscanf(f, "%o %64s %lu %u %511s\n",
+                           &entry->mode,
+                           hash_hex,
+                           &entry->mtime_sec,
+                           &entry->size,
+                           entry->path);
+        
+        if (result != 5) break; // End of file or parse error
+        
+        // Convert hex string to ObjectID
+        if (hex_to_hash(hash_hex, &entry->hash) != 0) {
+            fclose(f);
+            return -1;
+        }
+        
+        index->count++;
+    }
 
     fclose(f);
     return 0;
