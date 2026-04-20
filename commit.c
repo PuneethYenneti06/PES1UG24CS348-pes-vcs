@@ -224,7 +224,15 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     size_t commit_len;
     if (commit_serialize(&commit, &commit_data, &commit_len) != 0) return -1;
 
-    // (Writing to object store will go here in next step)
+    // 5. Write commit object to the store
+    ObjectID new_commit_id;
+    if (object_write(OBJ_COMMIT, commit_data, commit_len, &new_commit_id) != 0) {
+        free(commit_data);
+        return -1;
+    }
+
+    // Set the output parameter
+    *commit_id_out = new_commit_id;
 
     free(commit_data);
     return -1; // Placeholder
