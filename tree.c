@@ -162,8 +162,32 @@ int tree_from_index(ObjectID *id_out) {
             te->hash = index.entries[i].hash;
             i++;
         } else {
-            // Directory (handle in next step)
-            i++;
+            // Extract directory name (first path component)
+            int dir_len = slash - entry_path;
+            char dir_name[256];
+            strncpy(dir_name, entry_path, dir_len);
+            dir_name[dir_len] = '\0';
+
+            // Collect all entries under this directory
+            int dir_start = i;
+            int dir_count = 0;
+            while (i < index.count) {
+                const char *current = index.entries[i].path;
+                if (strncmp(current, dir_name, dir_len) == 0 && current[dir_len] == '/') {
+                    dir_count++;
+                    i++;
+                } else {
+                    break;
+                }
+            }
+
+            // Create a subtree for this directory
+            TreeEntry *te = &tree.entries[tree.count++];
+            te->mode = MODE_DIR;
+            strcpy(te->name, dir_name);
+
+            // Build subtree by recursively calling tree_from_index on the subentries
+            // For simplicity, we'll handle this in the next step
         }
     }
 
