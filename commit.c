@@ -202,7 +202,24 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     ObjectID parent_id;
     int has_parent = (head_read(&parent_id) == 0);
 
-    // (Commit struct construction will go here in next step)
+    // 3. Create commit struct
+    Commit commit = {0};
+    commit.tree = tree_id;
+    if (has_parent) {
+        commit.parent = parent_id;
+        commit.has_parent = 1;
+    } else {
+        commit.has_parent = 0;
+    }
+
+    // Get author and timestamp
+    snprintf(commit.author, sizeof(commit.author), "%s", pes_author());
+    commit.timestamp = (uint64_t)time(NULL);
+
+    // Copy message
+    snprintf(commit.message, sizeof(commit.message), "%s", message);
+
+    // (Serialization will go here in next step)
 
     return -1; // Placeholder
 }
