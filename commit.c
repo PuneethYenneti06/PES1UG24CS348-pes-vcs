@@ -219,7 +219,13 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     // Copy message
     snprintf(commit.message, sizeof(commit.message), "%s", message);
 
-    // (Serialization will go here in next step)
+    // 4. Serialize commit to text format
+    void *commit_data;
+    size_t commit_len;
+    if (commit_serialize(&commit, &commit_data, &commit_len) != 0) return -1;
 
+    // (Writing to object store will go here in next step)
+
+    free(commit_data);
     return -1; // Placeholder
 }
