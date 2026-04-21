@@ -97,9 +97,9 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
   // 1. Build the header
     char header[64];
     const char *type_str = "";
-    if (type == OBJECT_BLOB) type_str = "blob";
-    else if (type == OBJECT_TREE) type_str = "tree";
-    else if (type == OBJECT_COMMIT) type_str = "commit";
+    if (type == OBJ_BLOB) type_str = "blob";
+    else if (type == OBJ_TREE) type_str = "tree";
+    else if (type == OBJ_COMMIT) type_str = "commit";
     else return -1;
 
     int header_len = snprintf(header, sizeof(header), "%s %zu", type_str, len);
@@ -231,11 +231,11 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
     }
 
     if (strncmp((char *)buffer, "blob ", 5) == 0) {
-        *type_out = OBJECT_BLOB;
+        *type_out = OBJ_BLOB;
     } else if (strncmp((char *)buffer, "tree ", 5) == 0) {
-        *type_out = OBJECT_TREE;
+        *type_out = OBJ_TREE;
     } else if (strncmp((char *)buffer, "commit ", 7) == 0) {
-        *type_out = OBJECT_COMMIT;
+        *type_out = OBJ_COMMIT;
     } else {
         free(buffer);
         return -1; // Unknown object type
