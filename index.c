@@ -184,15 +184,18 @@ int index_load(Index *index) {
 //   - rename                           : atomically moving the temp file over the old index
 //
 // Returns 0 on success, -1 on error.
-int index_save(const Index *index) {
-    // Create a mutable copy for sorting
-    Index sorted = *index;
-    
-    // Sort entries by path (Git requirement for deterministic hashes)
+  // Sort entries by path (Git requirement for deterministic hashes)
     static int compare_entries(const void *a, const void *b) {
         return strcmp(((const IndexEntry *)a)->path, ((const IndexEntry *)b)->path);
     }
-    qsort(sorted.entries, sorted.count, sizeof(IndexEntry), compare_entries);
+
+int index_save(const Index *index) {
+    // Create a mutable copy for sorting
+    Index *sorted = malloc(sizeof(Index));
+    if (!sorted) return -1;
+    *sorted = *index;
+
+   qsort(sorted->entries, sorted->count, sizeof(IndexEntry), compare_entries);
 
     // Build temporary file path
     char temp_path[512];
@@ -202,17 +205,16 @@ int index_save(const Index *index) {
     FILE *f = fopen(temp_path, "w");
     if (!f) return -1;
 
-    for (int i = 0; i < sorted.count; i++) {
-        char hash_hex[HASH_HEX_SIZE + 1];
-        hash_to_hex(&sorted.entries[i].hash, hash_hex);
-
-        fprintf(f, "%o %s %lu %u %s\n",
-               sorted.entries[i].mode,
-               hash_hex,
-               sorted.entries[i].mtime_sec,
-               sorted.entries[i].size,
-               sorted.entries[i].path);
-    }
+   for (int i = 0; i < sorted->count; i++) {
+    char hash_hex[HASH_HEX_SIZE + 1];
+    hash_to_hex(&sorted->entries[i].hash, hash_hex);
+    fprintf(f, "%o %s %lu %u %s\n",
+           sorted->entries[i].mode,
+           hash_hex,
+           sorted->entries[i].mtime_sec,
+           sorted->entries[i].size,
+           sorted->entries[i].path);
+   }
 
     // Flush to disk
     fflush(f);
