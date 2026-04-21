@@ -122,18 +122,12 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     }
 
     // 4. Create shard directory (.pes/objects/XX/)
-	char hex[HASH_HEX_SIZE + 1];
-	hash_to_hex(id_out, hex);  // e.g. "a1b2c3d4..."
-
-	char dir_path[512];
-	snprintf(dir_path, sizeof(dir_path), "%s/%.2s", OBJECTS_DIR, hex);  // ".pes/objects/a1"
-
-	char final_path[512];
-	snprintf(final_path, sizeof(final_path), "%s/%.2s/%s", OBJECTS_DIR, hex, hex + 2);  // ".pes/objects/a1/b2c3d4..."
-
-	mkdir(OBJECTS_DIR, 0755);   // ensure .pes/objects/ exists
-	mkdir(dir_path, 0755);      // ensure .pes/objects/a1/ exists
-
+    char final_path[512];
+    object_path(id_out, final_path, sizeof(final_path));
+    
+    char dir_path[512];
+    snprintf(dir_path, sizeof(dir_path), "%s/%.2s", OBJECTS_DIR, final_path + strlen(OBJECTS_DIR) + 1);
+    mkdir(dir_path, 0755); // Ignore error if it already exists
 
     // 5. Write to a temporary file
     char temp_path[512];
