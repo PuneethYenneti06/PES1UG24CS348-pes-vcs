@@ -135,44 +135,48 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 //
 // Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
-    Index *index = malloc(sizeof(Index));
-    if (!index) return -1;
-    if (index_load(index) != 0) { free(index); return -1; }
+    Index index;
+    if (index_load(&index) != 0) return -1;
 
-    if (index->count == 0) {
+    if (index.count == 0) {
+        // Empty tree for empty index
         Tree empty_tree = { .count = 0 };
         void *data;
         size_t len;
-        if (tree_serialize(&empty_tree, &data, &len) != 0) { free(index); return -1; }
+        if (tree_serialize(&empty_tree, &data, &len) != 0) return -1;
         int ret = object_write(OBJ_TREE, data, len, id_out);
         free(data);
-        free(index);
         return ret;
     }
 
     Tree tree = { .count = 0 };
-
+    
+    // Sort entries by path for consistent processing
+    // (Index should already be sorted, but we process in order)
     int i = 0;
-    while (i < index->count) {
-        const char *entry_path = index->entries[i].path;
+    while (i < index.count) {
+        const char *entry_path = index.entries[i].path;
         const char *slash = strchr(entry_path, '/');
 
         if (!slash) {
+            // Simple file at root level
             TreeEntry *te = &tree.entries[tree.count++];
-            te->mode = index->entries[i].mode;
+            te->mode = index.entries[i].mode;
             strcpy(te->name, entry_path);
-            te->hash = index->entries[i].hash;
+            te->hash = index.entries[i].hash;
             i++;
         } else {
+            // Extract directory name (first path component)
             int dir_len = slash - entry_path;
             char dir_name[256];
             strncpy(dir_name, entry_path, dir_len);
             dir_name[dir_len] = '\0';
 
+            // Collect all entries under this directory
             int dir_start = i;
             int dir_count = 0;
-            while (i < index->count) {
-                const char *current = index->entries[i].path;
+            while (i < index.count) {
+                const char *current = index.entries[i].path;
                 if (strncmp(current, dir_name, dir_len) == 0 && current[dir_len] == '/') {
                     dir_count++;
                     i++;
@@ -181,49 +185,53 @@ int tree_from_index(ObjectID *id_out) {
                 }
             }
 
+            // Create a subtree for this directory
             TreeEntry *te = &tree.entries[tree.count++];
             te->mode = MODE_DIR;
             strcpy(te->name, dir_name);
 
-            Index *sub_index = malloc(sizeof(Index));
-            if (!sub_index) { free(index); return -1; }
-            sub_index->count = 0;
+            // Build subtree by creating a temporary sub-index
+            Index sub_index;
+            sub_index.count = 0;
             for (int j = dir_start; j < i; j++) {
-                strcpy(sub_index->entries[sub_index->count].path,
-                       index->entries[j].path + dir_len + 1);
-                sub_index->entries[sub_index->count].mode = index->entries[j].mode;
-                sub_index->entries[sub_index->count].hash = index->entries[j].hash;
-                sub_index->count++;
+                // Strip the directory prefix from paths
+                strcpy(sub_index.entries[sub_index.count].path, 
+                       index.entries[j].path + dir_len + 1);
+                sub_index.entries[sub_index.count].mode = index.entries[j].mode;
+                sub_index.entries[sub_index.count].hash = index.entries[j].hash;
+                sub_index.count++;
             }
 
+            // Recursively process the subtree (simplified: just handle files for now)
             Tree sub_tree = { .count = 0 };
-            for (int j = 0; j < sub_index->count; j++) {
-                if (strchr(sub_index->entries[j].path, '/') == NULL) {
+            for (int j = 0; j < sub_index.count; j++) {
+                if (strchr(sub_index.entries[j].path, '/') == NULL) {
                     TreeEntry *sub_te = &sub_tree.entries[sub_tree.count++];
-                    sub_te->mode = sub_index->entries[j].mode;
-                    strcpy(sub_te->name, sub_index->entries[j].path);
-                    sub_te->hash = sub_index->entries[j].hash;
+                    sub_te->mode = sub_index.entries[j].mode;
+                    strcpy(sub_te->name, sub_index.entries[j].path);
+                    sub_te->hash = sub_index.entries[j].hash;
                 }
             }
-            free(sub_index);
 
+            // Serialize and write this subtree
             void *sub_data;
             size_t sub_len;
-            if (tree_serialize(&sub_tree, &sub_data, &sub_len) != 0) { free(index); return -1; }
+            if (tree_serialize(&sub_tree, &sub_data, &sub_len) != 0) return -1;
             if (object_write(OBJ_TREE, sub_data, sub_len, &te->hash) != 0) {
                 free(sub_data);
-                free(index);
                 return -1;
             }
             free(sub_data);
         }
     }
 
+    // Serialize the root tree
     void *data;
     size_t len;
-    if (tree_serialize(&tree, &data, &len) != 0) { free(index); return -1; }
+    if (tree_serialize(&tree, &data, &len) != 0) return -1;
+
+    // Write root tree to object store
     int ret = object_write(OBJ_TREE, data, len, id_out);
     free(data);
-    free(index);
     return ret;
 }
